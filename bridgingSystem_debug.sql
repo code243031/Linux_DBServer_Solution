@@ -21,13 +21,13 @@ DELIMITER $$
 CREATE PROCEDURE GetCustomers() -- 전체 고객 목록
 BEGIN 
 	SELECT * 
-    FROM RegisterID; 
+    FROM View_Register; 
 END $$ 
 
 CREATE PROCEDURE GetOneCustomer(customerNM VARCHAR(25)) -- 회원 찾기
 BEGIN 
 	SELECT * 
-    FROM RegisterID
+    FROM View_Register
     WHERE UserId = customerNM;
 END $$ 
 
@@ -37,7 +37,7 @@ BEGIN
 
     SET nowDate = NOW();
 
-    INSERT INTO RegisterID VALUES (userId, HEX(AES_ENCRYPT(userPw, userId)), nowDate);
+    INSERT INTO View_Register VALUES (userId, HEX(AES_ENCRYPT(userPw, userId)), nowDate);
 END $$ 
 
 CREATE PROCEDURE ChangeId(oldId VARCHAR(25), newId VARCHAR(25)) -- ID 변경
@@ -46,7 +46,7 @@ BEGIN
 
     SET nowDate = NOW();
 
-    UPDATE RegisterID
+    UPDATE View_Register
     SET userId = newId
     WHERE UserId = oldId;
 END $$ 
@@ -57,7 +57,7 @@ BEGIN
 
     SET nowDate = NOW();
 
-    UPDATE RegisterID
+    UPDATE View_Register
     SET userPw = HEX(AES_ENCRYPT(userPw, userId)), LastAccessDate = nowDate
     WHERE UserId = targetId;
 END $$ 
@@ -93,33 +93,33 @@ DELIMITER $$
 CREATE PROCEDURE GetAllPaymentInfo() -- 전체 거래기록 목록
 BEGIN 
 	SELECT * 
-    FROM PaymentInformation; 
+    FROM View_PaymentInfo; 
 END $$ 
 
 CREATE PROCEDURE GetPaymentInfo(Sender VARCHAR(20), Receiver VARCHAR(20)) -- 특정 고객 둘 간의 주문내역
 BEGIN 
 	SELECT * 
-    FROM PaymentInformation
+    FROM View_PaymentInfo
     WHERE SendUser = Sender AND RecvUser = Receiver;
 END $$ 
 
 CREATE PROCEDURE GetSenderInfo(Sender VARCHAR(20)) -- 특정 송금인의 주문내역
 BEGIN 
 	SELECT * 
-    FROM PaymentInformation
+    FROM View_PaymentInfo
     WHERE SendUser = Sender;
 END $$ 
 
 CREATE PROCEDURE GetReceiverInfo(Receiver VARCHAR(20)) -- 특정 수취인의 주문내역
 BEGIN 
 	SELECT * 
-    FROM PaymentInformation
+    FROM View_PaymentInfo
     WHERE RecvUser = Receiver;
 END $$ 
 
 CREATE PROCEDURE PutReceiverInfo(Num INT, SendPlatform VARCHAR(20), SendUser VARCHAR(20), SendCurrency VARCHAR(20), SendTime VARCHAR(20), SendValue VARCHAR(20), RecvPlatform VARCHAR(20), RecvUser VARCHAR(20), RecvCurrency VARCHAR(20), RecvTime VARCHAR(20), RecvValue VARCHAR(20), Rate VARCHAR(20))
 BEGIN 
-	INSERT INTO PaymentInformation
+	INSERT INTO View_PaymentInfo
     VALUES (Num, SendPlatform, SendUser, SendCurrency, SendTime, SendValue, RecvPlatform, RecvUser, RecvCurrency, SendTime, SendValue, RecvPlatform);
 END $$ 
 DELIMITER ;
@@ -146,41 +146,58 @@ DELIMITER $$
 CREATE PROCEDURE GetRates() -- 전체 환율 목록
 BEGIN 
 	SELECT * 
-    FROM ExchangeRateInformation; 
+    FROM View_Rate; 
 END $$ 
 
 CREATE PROCEDURE GetOneRate(prop VARCHAR(20), std VARCHAR(20)) -- 특정 고객 둘 간의 주문내역
 BEGIN 
 	SELECT * 
-    FROM ExchangeRateInformation
+    FROM View_Rate
     WHERE propCurrency = prop AND stdCurrency = std;
 END $$ 
 
 CREATE PROCEDURE GetPropRates(prop VARCHAR(20)) -- prop 기준 검색
 BEGIN 
 	SELECT * 
-    FROM ExchangeRateInformation
+    FROM View_Rate
     WHERE propCurrency = prop;
 END $$ 
 
 CREATE PROCEDURE GetStdRates(Sender VARCHAR(20)) -- std 기준 검색
 BEGIN 
 	SELECT * 
-    FROM ExchangeRateInformation
+    FROM View_Rate
     WHERE stdCurrency = std;
 END $$ 
 
 CREATE PROCEDURE GetSource(Receiver VARCHAR(20)) -- 수집 플랫폼 기준 검색
 BEGIN 
 	SELECT * 
-    FROM ExchangeRateInformation
+    FROM View_Rate
     WHERE RecvUser = Receiver;
 END $$ 
 
 CREATE PROCEDURE PutRate(propCurrency VARCHAR(20), stdCurrency VARCHAR(20), buyRate VARCHAR(20), sellRate VARCHAR(20), source VARCHAR(20), lastModifiedDate DATETIME)
 BEGIN 
-	INSERT INTO ExchangeRateInformation
+	INSERT INTO View_Rate
     VALUES (propCurrency, stdCurrency, buyRate, sellRate, source, lastModifiedDate);
+END $$ 
+DELIMITER ;
+
+DELIMITER $$ 
+CREATE PROCEDURE ReplaceAll() -- 전체 변경사항 저장
+BEGIN 
+    CREATE OR REPLACE VIEW View_Register AS
+    SELECT UserId, UserPw, LastAccessDate
+    FROM RegisterID;
+
+    CREATE OR REPLACE VIEW View_PaymentInfo AS
+    SELECT Num, SendPlatform, SendUser, SendCurrency, SendTime, SendValue, RecvPlatform, RecvUser, RecvCurrency, RecvTime, RecvValue, Rate
+    FROM PaymentInformation;
+
+    CREATE OR REPLACE VIEW View_Rate AS
+    SELECT propCurrency, stdCurrency, buyRate, sellRate, source, lastModifiedDate
+    FROM ExchangeRateInformation;
 END $$ 
 DELIMITER ;
 
@@ -196,8 +213,22 @@ DROP USER IF EXISTS 'bridge'@'localhost';
 DROP USER IF EXISTS 'calcRate'@'localhost';
 
 CREATE USER 'bridge'@'localhost' IDENTIFIED BY 'tsnp2022&&';
-GRANT ALL ON BridgingSystem_Debug.RegisterID to 'bridge'@'localhost';
-GRANT ALL ON BridgingSystem_Debug.PaymentInformation to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetCustomers to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetOneCustomer to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.Register to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.ChangeId to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.ChangePw to 'bridge'@'localhost';
+
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetAllPaymentInfo to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetPaymentInfo to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetSenderInfo to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetReceiverInfo to 'bridge'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.PutReceiverInfo to 'bridge'@'localhost';
 
 CREATE USER 'calcRate'@'localhost' IDENTIFIED BY 'tsnp2022!!';
-GRANT ALL ON BridgingSystem_Debug.ExchangeRateInformation to 'calcRate'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetRates to 'calcRate'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetOneRate to 'calcRate'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetPropRates to 'calcRate'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetStdRates to 'calcRate'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.GetSource to 'calcRate'@'localhost';
+GRANT EXECUTE ON PROCEDURE BridgingSystem_Debug.PutRate to 'calcRate'@'localhost';
